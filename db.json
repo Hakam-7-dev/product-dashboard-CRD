@@ -1,0 +1,16 @@
+{
+  "products": [
+    {
+      "id": "305c",
+      "title": "iphone",
+      "price": 150,
+      "category": "devive"
+    },
+    {
+      "id": "wxu6slril",
+      "title": "Redmi",
+      "price": 250,
+      "category": "Device"
+    }
+  ]
+}
