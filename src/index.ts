@@ -103,9 +103,7 @@ class ProductApp {
 
     try {
       if (this.editingId !== null) {
-        await this.api.update(this.editingId, { ...product, id: this.editingId });
-        this.editingId = null;
-        this.submitBtn.textContent = "Add / Update";
+        this.submitBtn.textContent = "Add";
       } else {
         await this.api.create(product);
       }
@@ -128,15 +126,6 @@ class ProductApp {
         this.render();
       }
 
-      if (target.classList.contains("update")) {
-        const products = await this.api.getAll();
-        const product = products.find((p) => p.id === id);
-        if (!product) return;
-
-        this.editingId = id;
-        this.dom.fill(product);
-        this.submitBtn.textContent = "Update";
-      }
     } catch (err) {
       console.error(err);
     }
