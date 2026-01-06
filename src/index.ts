@@ -35,7 +35,7 @@ class ProductAPI {
       const error = await res.json();
       throw new Error(error.message || "Failed to create product");
     }
-    
+
     const data: Product[] = await res.json();
     if(!data || !data[0]) throw new Error("No product returned after creation");
     return data[0];
@@ -162,7 +162,7 @@ class ProductApp {
         tr.innerHTML = `
           <td>${index + 1}</td>
           <td>${p.title}</td>
-          <td>${p.price}</td>
+          <td>${p.price}$</td>
           <td>${p.category}</td>
           <td><button class="delete" data-id="${p.id}">Delete</button></td>
         `;
