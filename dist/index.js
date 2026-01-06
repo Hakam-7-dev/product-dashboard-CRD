@@ -9,46 +9,47 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 class ProductAPI {
     constructor() {
-        this.baseUrl = "http://localhost:3000/products";
+        this.baseUrl = "https://zzgiqrjbpbxmdtqjiqft.supabase.co/rest/v1/products";
+        this.headers = {
+            apikey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp6Z2lxcmpicGJ4bWR0cWppcWZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3MTA2NzgsImV4cCI6MjA4MzI4NjY3OH0.qk4rMBF1gdMZJx_pkYY6sBKFlnUoelqeANbADAKAphM",
+            Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp6Z2lxcmpicGJ4bWR0cWppcWZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3MTA2NzgsImV4cCI6MjA4MzI4NjY3OH0.qk4rMBF1gdMZJx_pkYY6sBKFlnUoelqeANbADAKAphM",
+            "Content-Type": "application/json",
+            Prefer: "return=representation"
+        };
     }
     getAll() {
         return __awaiter(this, void 0, void 0, function* () {
-            const res = yield fetch(this.baseUrl);
+            const res = yield fetch(`${this.baseUrl}?select=*`, { headers: this.headers });
             if (!res.ok)
                 throw new Error("Failed to fetch products");
-            return res.json();
+            const data = yield res.json();
+            return data;
         });
     }
     create(product) {
         return __awaiter(this, void 0, void 0, function* () {
-            if (!product.id) {
-                product.id = Math.random().toString(36).substr(2, 9);
-            }
+            const body = { title: product.title, price: product.price, category: product.category };
             const res = yield fetch(this.baseUrl, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(product),
+                headers: this.headers,
+                body: JSON.stringify(body)
             });
-            if (!res.ok)
-                throw new Error("Failed to create product");
-            return res.json();
-        });
-    }
-    update(id, product) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const res = yield fetch(`${this.baseUrl}/${id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(product),
-            });
-            if (!res.ok)
-                throw new Error("Failed to update product");
-            return res.json();
+            if (!res.ok) {
+                const error = yield res.json();
+                throw new Error(error.message || "Failed to create product");
+            }
+            const data = yield res.json();
+            if (!data || !data[0])
+                throw new Error("No product returned after creation");
+            return data[0];
         });
     }
     delete(id) {
         return __awaiter(this, void 0, void 0, function* () {
-            const res = yield fetch(`${this.baseUrl}/${id}`, { method: "DELETE" });
+            const res = yield fetch(`${this.baseUrl}?id=eq.${id}`, {
+                method: "DELETE",
+                headers: this.headers
+            });
             if (!res.ok)
                 throw new Error("Failed to delete product");
         });
@@ -56,90 +57,87 @@ class ProductAPI {
 }
 class DomInputs {
     constructor() {
-        this.title = document.getElementById("title");
-        this.price = document.getElementById("price");
-        this.category = document.getElementById("category");
-        this.total = document.getElementById("total");
+        const titleInput = document.getElementById("title");
+        const priceInput = document.getElementById("price");
+        const categoryInput = document.getElementById("category");
+        if (!(titleInput instanceof HTMLInputElement))
+            throw new Error("Missing title input");
+        if (!(priceInput instanceof HTMLInputElement))
+            throw new Error("Missing price input");
+        if (!(categoryInput instanceof HTMLInputElement))
+            throw new Error("Missing category input");
+        this.title = titleInput;
+        this.price = priceInput;
+        this.category = categoryInput;
     }
     read() {
         return {
-            id: "",
             title: this.title.value.trim(),
             price: Number(this.price.value) || 0,
-            category: this.category.value.trim(),
+            category: this.category.value.trim()
         };
-    }
-    fill(product) {
-        this.title.value = product.title;
-        this.price.value = String(product.price);
-        this.category.value = product.category;
-        this.total.textContent = String(product.price);
     }
     clear() {
         this.title.value = "";
         this.price.value = "";
         this.category.value = "";
-        this.total.textContent = "0";
     }
 }
 class ProductApp {
     constructor() {
         this.api = new ProductAPI();
         this.dom = new DomInputs();
-        this.tbody = document.querySelector("tbody");
-        this.submitBtn = document.getElementById("submit");
-        this.searchInput = document.getElementById("search");
-        this.editingId = null;
-        this.submitBtn.addEventListener("click", () => this.handleSubmit());
-        this.tbody.addEventListener("click", (e) => this.handleTableClick(e));
+        const tbodyEl = document.querySelector("tbody");
+        const submitBtnEl = document.getElementById("submit");
+        const searchInputEl = document.getElementById("search");
+        if (!(tbodyEl instanceof HTMLTableSectionElement))
+            throw new Error("Missing tbody element");
+        if (!(submitBtnEl instanceof HTMLButtonElement))
+            throw new Error("Missing submit button");
+        if (!(searchInputEl instanceof HTMLInputElement))
+            throw new Error("Missing search input");
+        this.tbody = tbodyEl;
+        this.submitBtn = submitBtnEl;
+        this.searchInput = searchInputEl;
+        this.submitBtn.addEventListener("click", () => this.handleAdd());
+        this.tbody.addEventListener("click", (e) => this.handleDeleteClick(e));
         this.searchInput.addEventListener("input", () => this.render());
         this.render();
     }
-    handleSubmit() {
+    handleAdd() {
         return __awaiter(this, void 0, void 0, function* () {
             const product = this.dom.read();
             if (!product.title || !product.category)
                 return;
             try {
-                if (this.editingId !== null) {
-                    yield this.api.update(this.editingId, Object.assign(Object.assign({}, product), { id: this.editingId }));
-                    this.editingId = null;
-                    this.submitBtn.textContent = "Add / Update";
-                }
-                else {
-                    yield this.api.create(product);
-                }
+                yield this.api.create(product);
                 this.dom.clear();
-                this.render();
+                yield this.render();
             }
             catch (err) {
                 console.error(err);
+                alert("Error adding product: " + (err instanceof Error ? err.message : String(err)));
             }
         });
     }
-    handleTableClick(e) {
+    handleDeleteClick(e) {
         return __awaiter(this, void 0, void 0, function* () {
             const target = e.target;
-            const id = target.dataset.id;
-            if (!id)
+            if (!(target instanceof HTMLButtonElement))
                 return;
+            if (!target.classList.contains("delete"))
+                return;
+            const idStr = target.dataset.id;
+            if (!idStr)
+                return;
+            const id = Number(idStr);
             try {
-                if (target.classList.contains("delete")) {
-                    yield this.api.delete(id);
-                    this.render();
-                }
-                if (target.classList.contains("update")) {
-                    const products = yield this.api.getAll();
-                    const product = products.find((p) => p.id === id);
-                    if (!product)
-                        return;
-                    this.editingId = id;
-                    this.dom.fill(product);
-                    this.submitBtn.textContent = "Update";
-                }
+                yield this.api.delete(id);
+                yield this.render();
             }
             catch (err) {
                 console.error(err);
+                alert("Error deleting product: " + (err instanceof Error ? err.message : String(err)));
             }
         });
     }
@@ -164,6 +162,7 @@ class ProductApp {
             }
             catch (err) {
                 console.error(err);
+                this.tbody.innerHTML = `<tr><td colspan="5">Failed to load products</td></tr>`;
             }
         });
     }

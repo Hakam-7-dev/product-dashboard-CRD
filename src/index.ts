@@ -1,6 +1,6 @@
 // ================== TYPES ==================
 interface Product {
-  id: string;           // string IDs everywhere
+  id?: number; // Supabase auto-generates numeric IDs
   title: string;
   price: number;
   category: string;
@@ -8,143 +8,157 @@ interface Product {
 
 // ================== API LAYER ==================
 class ProductAPI {
-  private readonly baseUrl = "http://localhost:3000/products";
+  private readonly baseUrl: string = "https://zzgiqrjbpbxmdtqjiqft.supabase.co/rest/v1/products";
+  private readonly headers: Record<string, string> = {
+    apikey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp6Z2lxcmpicGJ4bWR0cWppcWZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3MTA2NzgsImV4cCI6MjA4MzI4NjY3OH0.qk4rMBF1gdMZJx_pkYY6sBKFlnUoelqeANbADAKAphM",
+    Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp6Z2lxcmpicGJ4bWR0cWppcWZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3MTA2NzgsImV4cCI6MjA4MzI4NjY3OH0.qk4rMBF1gdMZJx_pkYY6sBKFlnUoelqeANbADAKAphM",
+    "Content-Type": "application/json",
+    Prefer: "return=representation" // return created row
+  };
 
   async getAll(): Promise<Product[]> {
-    const res = await fetch(this.baseUrl);
+    const res: Response = await fetch(`${this.baseUrl}?select=*`, { headers: this.headers });
     if (!res.ok) throw new Error("Failed to fetch products");
-    return res.json();
+    const data: Product[] = await res.json();
+    return data;
   }
 
   async create(product: Product): Promise<Product> {
-    // Ensure string ID
-    if (!product.id) {
-      product.id = Math.random().toString(36).substr(2, 9);
-    }
-    const res = await fetch(this.baseUrl, {
+    const body: Omit<Product, "id"> = { title: product.title, price: product.price, category: product.category };
+    const res: Response = await fetch(this.baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(product),
+      headers: this.headers,
+      body: JSON.stringify(body)
     });
-    if (!res.ok) throw new Error("Failed to create product");
-    return res.json();
+
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.message || "Failed to create product");
+    }
+    
+    const data: Product[] = await res.json();
+    if(!data || !data[0]) throw new Error("No product returned after creation");
+    return data[0];
   }
 
-  async update(id: string, product: Product): Promise<Product> {
-    const res = await fetch(`${this.baseUrl}/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(product),
+  async delete(id: number): Promise<void> {
+    const res: Response = await fetch(`${this.baseUrl}?id=eq.${id}`, {
+      method: "DELETE",
+      headers: this.headers
     });
-    if (!res.ok) throw new Error("Failed to update product");
-    return res.json();
-  }
-
-  async delete(id: string): Promise<void> {
-    const res = await fetch(`${this.baseUrl}/${id}`, { method: "DELETE" });
     if (!res.ok) throw new Error("Failed to delete product");
   }
 }
 
 // ================== DOM INPUTS ==================
 class DomInputs {
-  title = document.getElementById("title") as HTMLInputElement;
-  price = document.getElementById("price") as HTMLInputElement;
-  category = document.getElementById("category") as HTMLInputElement;
-  total = document.getElementById("total") as HTMLParagraphElement;
+  title: HTMLInputElement;
+  price: HTMLInputElement;
+  category: HTMLInputElement;
+
+  constructor() {
+    const titleInput = document.getElementById("title");
+    const priceInput = document.getElementById("price");
+    const categoryInput = document.getElementById("category");
+
+    if (!(titleInput instanceof HTMLInputElement)) throw new Error("Missing title input");
+    if (!(priceInput instanceof HTMLInputElement)) throw new Error("Missing price input");
+    if (!(categoryInput instanceof HTMLInputElement)) throw new Error("Missing category input");
+
+    this.title = titleInput;
+    this.price = priceInput;
+    this.category = categoryInput;
+  }
 
   read(): Product {
     return {
-      id: "", // will be generated in API if empty
       title: this.title.value.trim(),
       price: Number(this.price.value) || 0,
-      category: this.category.value.trim(),
+      category: this.category.value.trim()
     };
-  }
-
-  fill(product: Product): void {
-    this.title.value = product.title;
-    this.price.value = String(product.price);
-    this.category.value = product.category;
-    this.total.textContent = String(product.price);
   }
 
   clear(): void {
     this.title.value = "";
     this.price.value = "";
     this.category.value = "";
-    this.total.textContent = "0";
   }
 }
 
 // ================== APP CONTROLLER ==================
 class ProductApp {
-  private api = new ProductAPI();
-  private dom = new DomInputs();
-
-  private tbody = document.querySelector("tbody") as HTMLTableSectionElement;
-  private submitBtn = document.getElementById("submit") as HTMLButtonElement;
-  private searchInput = document.getElementById("search") as HTMLInputElement;
-
-  private editingId: string | null = null;
+  private api: ProductAPI = new ProductAPI();
+  private dom: DomInputs = new DomInputs();
+  private tbody: HTMLTableSectionElement;
+  private submitBtn: HTMLButtonElement;
+  private searchInput: HTMLInputElement;
 
   constructor() {
-    this.submitBtn.addEventListener("click", () => this.handleSubmit());
-    this.tbody.addEventListener("click", (e) => this.handleTableClick(e));
+    const tbodyEl = document.querySelector("tbody");
+    const submitBtnEl = document.getElementById("submit");
+    const searchInputEl = document.getElementById("search");
+
+    if (!(tbodyEl instanceof HTMLTableSectionElement)) throw new Error("Missing tbody element");
+    if (!(submitBtnEl instanceof HTMLButtonElement)) throw new Error("Missing submit button");
+    if (!(searchInputEl instanceof HTMLInputElement)) throw new Error("Missing search input");
+
+    this.tbody = tbodyEl;
+    this.submitBtn = submitBtnEl;
+    this.searchInput = searchInputEl;
+
+    this.submitBtn.addEventListener("click", () => this.handleAdd());
+    this.tbody.addEventListener("click", (e: Event) => this.handleDeleteClick(e));
     this.searchInput.addEventListener("input", () => this.render());
 
     this.render();
   }
 
-  // ---------- CREATE / UPDATE ----------
-  private async handleSubmit(): Promise<void> {
-    const product = this.dom.read();
+  // ---------- ADD PRODUCT ----------
+  private async handleAdd(): Promise<void> {
+    const product: Product = this.dom.read();
     if (!product.title || !product.category) return;
 
     try {
-      if (this.editingId !== null) {
-        this.submitBtn.textContent = "Add";
-      } else {
-        await this.api.create(product);
-      }
+      await this.api.create(product);
       this.dom.clear();
-      this.render();
-    } catch (err) {
+      await this.render(); // refresh table immediately
+    } catch (err: unknown) {
       console.error(err);
+      alert("Error adding product: " + (err instanceof Error ? err.message : String(err)));
     }
   }
 
-  // ---------- DELETE / EDIT ----------
-  private async handleTableClick(e: Event): Promise<void> {
-    const target = e.target as HTMLElement;
-    const id = target.dataset.id;
-    if (!id) return;
+  // ---------- DELETE PRODUCT ----------
+  private async handleDeleteClick(e: Event): Promise<void> {
+    const target = e.target;
+    if (!(target instanceof HTMLButtonElement)) return; // type guard
+    if (!target.classList.contains("delete")) return;
 
+    const idStr = target.dataset.id;
+    if (!idStr) return;
+
+    const id: number = Number(idStr);
     try {
-      if (target.classList.contains("delete")) {
-        await this.api.delete(id);
-        this.render();
-      }
-
-    } catch (err) {
+      await this.api.delete(id);
+      await this.render();
+    } catch (err: unknown) {
       console.error(err);
+      alert("Error deleting product: " + (err instanceof Error ? err.message : String(err)));
     }
   }
 
-  // ---------- RENDER ----------
+  // ---------- RENDER TABLE ----------
   private async render(): Promise<void> {
     try {
-      const products = await this.api.getAll();
-      const query = this.searchInput.value.toLowerCase();
+      const products: Product[] = await this.api.getAll();
+      const query: string = this.searchInput.value.toLowerCase();
 
-      const filtered = products.filter((p) =>
-        p.title.toLowerCase().includes(query)
-      );
+      const filtered: Product[] = products.filter((p) => p.title.toLowerCase().includes(query));
 
       this.tbody.innerHTML = "";
 
-      filtered.forEach((p, index) => {
-        const tr = document.createElement("tr");
+      filtered.forEach((p: Product, index: number) => {
+        const tr: HTMLTableRowElement = document.createElement("tr");
         tr.innerHTML = `
           <td>${index + 1}</td>
           <td>${p.title}</td>
@@ -154,11 +168,12 @@ class ProductApp {
         `;
         this.tbody.appendChild(tr);
       });
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(err);
+      this.tbody.innerHTML = `<tr><td colspan="5">Failed to load products</td></tr>`;
     }
   }
 }
 
-// ================== BOOTSTRAP ==================
+// ================== INIT APP ==================
 new ProductApp();
