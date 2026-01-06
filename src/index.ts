@@ -1,6 +1,6 @@
 // ================== TYPES ==================
 interface Product {
-  id?: number; // Supabase auto-generates numeric IDs
+  id?: number;
   title: string;
   price: number;
   category: string;
