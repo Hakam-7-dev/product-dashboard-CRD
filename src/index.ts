@@ -162,7 +162,7 @@ class ProductApp {
         tr.innerHTML = `
           <td>${index + 1}</td>
           <td>${p.title}</td>
-          <td>${p.price}</td>
+          <td>${p.price}$</td>
           <td>${p.category}</td>
           <td><button class="delete" data-id="${p.id}">Delete</button></td>
         `;
